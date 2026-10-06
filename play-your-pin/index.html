@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Play Your PIN</title>
+    <meta
+      name="description"
+      content="An experiment in sonic input: a ten-key piano replaces the numeric keypad. You don't type your PIN. You play it."
+    />
+    <meta name="theme-color" content="#F6F3EC" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              paper: "#F6F3EC",
+              ink: "#141210",
+              muted: "#7D766B",
+              signal: "#141210",
+            },
+            fontFamily: {
+              sans: ["Archivo", "system-ui", "sans-serif"],
+              mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root {
+        --paper: #f6f3ec;
+        --stone: #d9d6cf;
+        --ink: #141210;
+        --muted: #7d766b;
+        --signal: #141210;
+        --hair: rgba(20, 18, 16, 0.16);
+        /* Fallbacks; replaced at runtime by true spring curves via linear() */
+        --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+        --spring-dur: 520ms;
+        --spring-soft: cubic-bezier(0.22, 1.12, 0.36, 1);
+        --spring-soft-dur: 900ms;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #f2efe8;
+        color: var(--ink);
+      }
+      body {
+        font-family: Archivo, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior: none;
+      }
+      ::selection {
+        background: var(--signal);
+        color: var(--paper);
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+
+      .mono {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 500;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      /* ---------- Device ---------- */
+      .stage {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: 20px;
+      }
+      .device {
+        position: relative;
+        width: 412px;
+        height: 866px;
+        padding: 11px;
+        border-radius: 64px;
+        background: linear-gradient(145deg, #3a3633, #121110 40%, #1e1c1a);
+        box-shadow:
+          inset 0 0 0 1.5px #57514b,
+          inset 0 0 0 4px #0b0a09,
+          0 60px 90px -50px rgba(60, 40, 15, 0.55),
+          0 24px 40px -24px rgba(60, 40, 15, 0.4);
+        transform-origin: 0 0;
+      }
+      .device::before,
+      .device::after {
+        content: "";
+        position: absolute;
+        width: 3px;
+        border-radius: 2px;
+        background: #2a2724;
+      }
+      .device::before {
+        left: -3px;
+        top: 180px;
+        height: 100px;
+        box-shadow: 0 -60px 0 -0px #2a2724;
+      }
+      .device::after {
+        right: -3px;
+        top: 230px;
+        height: 96px;
+      }
+      .screen {
+        --h: 844px;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 53px;
+        overflow: hidden;
+        background: var(--paper);
+        isolation: isolate;
+      }
+      .screen::after {
+        /* paper grain */
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 40;
+        opacity: 0.04;
+        mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      }
+      .statusbar {
+        position: relative;
+        height: 54px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 30px 0 40px;
+        font:
+          600 16px/1 -apple-system,
+          "SF Pro Text",
+          Archivo,
+          sans-serif;
+        letter-spacing: -0.01em;
+      }
+      .island {
+        position: absolute;
+        left: 50%;
+        top: 11px;
+        width: 124px;
+        height: 36px;
+        margin-left: -62px;
+        border-radius: 20px;
+        background: #000;
+      }
+      .home-ind {
+        position: absolute;
+        left: 50%;
+        bottom: 8px;
+        width: 136px;
+        height: 5px;
+        margin-left: -68px;
+        border-radius: 3px;
+        background: var(--ink);
+        z-index: 30;
+      }
+      @media (max-width: 639px) {
+        html,
+        body {
+          background: var(--paper);
+        }
+        .stage {
+          padding: 0;
+          display: block;
+        }
+        .device {
+          width: 100%;
+          height: 100dvh;
+          padding: 0;
+          border-radius: 0;
+          background: none;
+          box-shadow: none;
+        }
+        .device::before,
+        .device::after,
+        .statusbar,
+        .home-ind {
+          display: none;
+        }
+        .screen {
+          --h: 100dvh;
+          border-radius: 0;
+          padding-top: env(safe-area-inset-top);
+        }
+      }
+
+      /* ---------- Headline ---------- */
+      .headline {
+        font-weight: 850;
+        font-stretch: 66%;
+        font-variation-settings: "wdth" 66;
+        font-size: min(64px, calc(var(--h) * 0.076));
+        line-height: 1.05;
+        letter-spacing: -0.012em;
+      }
+      .headline em {
+        display: inline-block;
+        font-style: italic;
+        font-weight: 300;
+        font-stretch: 84%;
+        font-variation-settings: "wdth" 84;
+        letter-spacing: -0.025em;
+      }
+
+      /* ---------- Keys ---------- */
+      .keys {
+        display: flex;
+        gap: 5px;
+        height: min(158px, calc(var(--h) * 0.19));
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+      .key {
+        --d: 0;
+        flex: 1 1 0;
+        position: relative;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .key-face {
+        position: absolute;
+        inset: 0 0 6px 0;
+        border-radius: 7px;
+        background: linear-gradient(180deg, #fffdf8 0%, #faf6ee 55%, #efe9dd 100%);
+        transform: translateY(calc(var(--d) * 5px)) scaleY(calc(1 - var(--d) * 0.012));
+        transform-origin: 50% 0;
+        box-shadow:
+          inset 0 0 0 1px rgba(20, 18, 16, 0.07),
+          inset 0 1.5px 0 #fff,
+          0 calc(5px - var(--d) * 4px) 0 #d8cfbf,
+          0 calc(6px - var(--d) * 4px) 0 rgba(20, 18, 16, 0.08),
+          0 calc(12px - var(--d) * 7px) calc(16px - var(--d) * 9px) rgba(70, 45, 20, 0.2);
+        will-change: transform;
+        overflow: hidden;
+      }
+      .key-face::before {
+        /* the ink that floods in as the key goes down */
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(180deg, #2b2825 0%, #161412 55%, #0c0b0a 100%);
+        opacity: calc(var(--d) * 1.7);
+        pointer-events: none;
+      }
+      .key-label {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 14px;
+        text-align: center;
+        font:
+          600 12px/1 "IBM Plex Mono",
+          monospace;
+        color: var(--ink);
+        pointer-events: none;
+      }
+      .key-label.inv {
+        color: var(--paper);
+        opacity: calc(var(--d) * 1.7);
+      }
+      .key-note {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 12px;
+        text-align: center;
+        font:
+          italic 700 13px/1 Archivo,
+          sans-serif;
+        color: var(--muted);
+        opacity: 0;
+        transform: translateY(-4px);
+        transition:
+          opacity 0.4s ease,
+          transform var(--spring-dur) var(--spring);
+        pointer-events: none;
+      }
+      .free .key-note {
+        opacity: 0.9;
+        transform: none;
+      }
+      .key:focus-visible .key-face {
+        outline: 2px solid var(--ink);
+        outline-offset: 2px;
+      }
+
+      /* ---------- PIN dots ---------- */
+      .dots {
+        display: flex;
+        gap: 18px;
+      }
+      .dot {
+        --i: 0;
+        position: relative;
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1.5px var(--ink);
+      }
+      .dot::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: var(--ink);
+        transform: scale(0);
+        transition: transform var(--spring-dur) var(--spring);
+      }
+      .dot.on::after {
+        transform: scale(1);
+      }
+      .dot.on {
+        animation: pop var(--spring-dur) var(--spring);
+      }
+      .dots.wobble .dot {
+        animation: wobble 620ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+        animation-delay: calc(var(--i) * 34ms);
+      }
+      .dots.success .dot {
+        animation: pulse 560ms cubic-bezier(0.3, 0.8, 0.3, 1) both;
+        animation-delay: calc(var(--i) * 125ms);
+      }
+      .dots.success .dot::after {
+        background: var(--signal);
+        transition: background 0.2s ease calc(var(--i) * 125ms);
+      }
+      .dots.success .dot {
+        box-shadow: inset 0 0 0 1.5px var(--signal);
+      }
+      .dots.success .dot::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1.5px var(--signal);
+        opacity: 0;
+        animation: halo 1000ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+        animation-delay: calc(var(--i) * 125ms);
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(0.8);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        32% {
+          transform: scale(1.55);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      @keyframes halo {
+        0% {
+          opacity: 0.6;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(2.8);
+        }
+      }
+      @keyframes wobble {
+        0% {
+          transform: translateX(0) rotate(0);
+        }
+        16% {
+          transform: translateX(-6px) rotate(-6deg);
+        }
+        32% {
+          transform: translateX(5px) rotate(5deg);
+        }
+        48% {
+          transform: translateX(-3.5px) rotate(-3deg);
+        }
+        64% {
+          transform: translateX(2px) rotate(1.5deg);
+        }
+        80% {
+          transform: translateX(-0.8px);
+        }
+        100% {
+          transform: translateX(0) rotate(0);
+        }
+      }
+
+      /* ---------- Messages & layers ---------- */
+      .msg {
+        animation: msgIn var(--spring-dur) var(--spring) both;
+      }
+      @keyframes msgIn {
+        0% {
+          opacity: 0;
+          transform: translateY(7px);
+          filter: blur(3px);
+        }
+        100% {
+          opacity: 1;
+          transform: none;
+          filter: none;
+        }
+      }
+      .layer {
+        transition:
+          opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1),
+          transform var(--spring-soft-dur) var(--spring-soft),
+          filter 0.6s ease;
+      }
+      .layer.gone-up {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.985);
+        filter: blur(6px);
+        pointer-events: none;
+      }
+      .layer.gone-down {
+        opacity: 0;
+        transform: translateY(22px) scale(0.99);
+        filter: blur(6px);
+        pointer-events: none;
+      }
+      .comp {
+        position: absolute;
+        right: -28px;
+        top: -0.26em;
+        width: 2.86em;
+        height: 4.95em;
+        pointer-events: none;
+      }
+      .comp-bar {
+        transform-box: fill-box;
+        transform-origin: 50% 0;
+      }
+      .comp-bar.hit {
+        animation: barHit 700ms var(--spring) both;
+      }
+      @keyframes barHit {
+        0% {
+          transform: translateY(0);
+        }
+        18% {
+          transform: translateY(7px) scaleY(0.985);
+        }
+        100% {
+          transform: translateY(0);
+        }
+      }
+      .comp-line.hit {
+        animation: string 620ms linear both;
+      }
+      @keyframes string {
+        0% {
+          transform: translateX(0);
+        }
+        10% {
+          transform: translateX(1.8px);
+        }
+        20% {
+          transform: translateX(-1.5px);
+        }
+        30% {
+          transform: translateX(1.2px);
+        }
+        42% {
+          transform: translateX(-0.9px);
+        }
+        56% {
+          transform: translateX(0.6px);
+        }
+        72% {
+          transform: translateX(-0.3px);
+        }
+        100% {
+          transform: translateX(0);
+        }
+      }
+      .chord-bar {
+        transform-box: fill-box;
+        transform-origin: 50% 100%;
+        animation: grow 1.1s var(--spring-soft) both;
+      }
+      @keyframes grow {
+        0% {
+          transform: scaleY(0);
+        }
+        100% {
+          transform: scaleY(1);
+        }
+      }
+      .art-circle {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: breathe 7s ease-in-out infinite;
+      }
+      @keyframes breathe {
+        50% {
+          transform: scale(1.025);
+        }
+      }
+      .seal {
+        animation: sealIn 1.1s var(--spring-soft) both 0.15s;
+      }
+      @keyframes sealIn {
+        0% {
+          transform: scale(0.6) rotate(-20deg);
+          opacity: 0;
+        }
+        100% {
+          transform: none;
+          opacity: 1;
+        }
+      }
+
+      /* ---------- Free-play staff ---------- */
+      .staff {
+        position: relative;
+        height: 72px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+      }
+      .staff-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--hair);
+      }
+      .note-dot {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        margin: -4px 0 0 -4px;
+        border-radius: 50%;
+        background: var(--ink);
+        animation: drift 4.2s linear forwards;
+      }
+      .note-dot.hot {
+        background: var(--signal);
+      }
+      @keyframes drift {
+        0% {
+          left: 70%;
+          opacity: 0;
+          transform: scale(0.3);
+        }
+        5% {
+          opacity: 1;
+          transform: scale(1.3);
+        }
+        12% {
+          transform: scale(1);
+        }
+        80% {
+          opacity: 0.9;
+        }
+        100% {
+          left: -4%;
+          opacity: 0;
+          transform: scale(0.9);
+        }
+      }
+
+      /* ---------- Controls ---------- */
+      .linkbtn {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 500;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        min-height: 44px;
+        padding: 0 2px;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .linkbtn.u span {
+        text-decoration: underline;
+        text-underline-offset: 4px;
+        text-decoration-thickness: 1px;
+      }
+      .linkbtn .arrow {
+        transition: transform var(--spring-dur) var(--spring);
+      }
+      .linkbtn:hover .arrow {
+        transform: translateX(4px);
+      }
+      .linkbtn:focus-visible,
+      .pill:focus-visible,
+      .solid-btn:focus-visible {
+        outline: 1.5px solid var(--ink);
+        outline-offset: 3px;
+        border-radius: 999px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 38px;
+        padding: 0 18px 0 16px;
+        border-radius: 999px;
+        border: 1.25px solid var(--ink);
+        background: transparent;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 600;
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform var(--spring-dur) var(--spring);
+      }
+      .pill:active {
+        transform: scale(0.94);
+      }
+      .bars {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        height: 14px;
+      }
+      .bars i {
+        display: block;
+        width: 2px;
+        border-radius: 1px;
+        background: currentColor;
+        transition: height var(--spring-dur) var(--spring);
+      }
+      .solid-btn {
+        height: 54px;
+        width: 100%;
+        border-radius: 999px;
+        background: var(--ink);
+        color: var(--paper);
+        border: 0;
+        cursor: pointer;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 600;
+        font-size: 11.5px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        transition: transform var(--spring-dur) var(--spring);
+      }
+      .solid-btn:active {
+        transform: scale(0.97);
+      }
+
+      .sound-btn {
+        position: absolute;
+        right: 20px;
+        bottom: max(26px, env(safe-area-inset-bottom));
+        z-index: 30;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 253, 248, 0.6);
+        box-shadow: inset 0 0 0 1.25px var(--ink);
+        color: var(--ink);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          transform var(--spring-dur) var(--spring),
+          background 0.25s ease,
+          color 0.25s ease;
+      }
+      .sound-btn:active {
+        transform: scale(0.9);
+      }
+      .sound-btn.on {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .sound-btn:focus-visible {
+        outline: 1.5px solid var(--ink);
+        outline-offset: 3px;
+      }
+      .sound-btn .wave {
+        transition:
+          opacity 0.3s ease,
+          transform var(--spring-dur) var(--spring);
+        transform-origin: 9px 12px;
+      }
+      .sound-btn:not(.on) .wave {
+        opacity: 0;
+        transform: scale(0.6);
+      }
+      .sound-btn .mute {
+        transition: opacity 0.25s ease;
+      }
+      .sound-btn.on .mute {
+        opacity: 0;
+      }
+      .sound-btn.on .wave-2 {
+        animation: emit 1.8s ease-in-out infinite;
+      }
+      @keyframes emit {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      @media (min-width: 640px) {
+        /* framed desktop view: the button lives in the page corner, outside the phone */
+        .sound-btn.page {
+          position: fixed;
+          right: 28px;
+          bottom: 28px;
+          width: 52px;
+          height: 52px;
+          z-index: 60;
+        }
+        @media (max-width: 639px) {
+          /* full-screen phone: keep the corner clear of the bottom links */
+          .sound-btn.page {
+            right: 16px;
+            bottom: auto;
+            top: calc(env(safe-area-inset-top) + 12px);
+            width: 40px;
+            height: 40px;
+          }
+        }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dots.wobble .dot,
+        .dots.success .dot,
+        .dots.success .dot::before,
+        .dot.on,
+        .art-circle,
+        .seal,
+        .comp-bar.hit,
+        .comp-line.hit,
+        .chord-bar {
+          animation: none;
+        }
+        .layer {
+          transition: opacity 0.4s ease;
+        }
+        .layer.gone-up,
+        .layer.gone-down {
+          transform: none;
+          filter: none;
+        }
+      }
+    </style>
+
+    <script>
+      // Build true spring curves as CSS linear() easings when supported.
+      (function () {
+        function springLinear(k, c) {
+          var x = 0,
+            v = 0,
+            t = 0,
+            dt = 1 / 240,
+            pts = [0];
+          while (t < 3) {
+            var a = -k * (x - 1) - c * v;
+            v += a * dt;
+            x += v * dt;
+            t += dt;
+            pts.push(x);
+            if (t > 0.15 && Math.abs(x - 1) < 0.0008 && Math.abs(v) < 0.01) break;
+          }
+          var n = 48,
+            out = [];
+          for (var i = 0; i <= n; i++)
+            out.push(pts[Math.round((i / n) * (pts.length - 1))].toFixed(3));
+          out[out.length - 1] = "1";
+          return { e: "linear(" + out.join(", ") + ")", d: Math.round(t * 1000) + "ms" };
+        }
+        try {
+          if (window.CSS && CSS.supports("transition-timing-function", "linear(0, 1)")) {
+            var r = document.documentElement.style;
+            var s = springLinear(260, 17);
+            var soft = springLinear(110, 17);
+            r.setProperty("--spring", s.e);
+            r.setProperty("--spring-dur", s.d);
+            r.setProperty("--spring-soft", soft.e);
+            r.setProperty("--spring-soft-dur", soft.d);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p style="padding: 40px; font-family: sans-serif">
+        Play Your PIN needs JavaScript to make sound.
+      </p>
+    </noscript>
+
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
+      crossorigin
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+
+    <!--
+      Synth: a small Web Audio "felt piano" voice. Inharmonic partials, a hammer
+      transient, a closing low-pass and a generated reverb tail. No samples.
+    -->
+    <script>
+      window.Synth = (function () {
+        // C-major scale from C4: digits 0–9 map to C D E F G A B C D E
+        var SCALE = [261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 493.88, 523.25, 587.33, 659.25];
+        var ctx = null,
+          master = null,
+          bus = null,
+          noise = null,
+          enabled = true;
+        var listeners = [];
+        function notify() {
+          listeners.forEach(function (fn) {
+            fn(!!ctx && ctx.state === "running");
+          });
+        }
+
+        function ensure() {
+          if (!ctx) {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            try {
+              ctx = new AC({ latencyHint: "interactive" });
+            } catch (e) {
+              ctx = new AC();
+            }
+            ctx.onstatechange = notify;
+            master = ctx.createGain();
+            master.gain.value = enabled ? 0.85 : 0;
+            var comp = ctx.createDynamicsCompressor();
+            comp.threshold.value = -16;
+            comp.knee.value = 12;
+            comp.ratio.value = 3;
+            comp.attack.value = 0.004;
+            comp.release.value = 0.2;
+            master.connect(comp);
+            comp.connect(ctx.destination);
+
+            bus = ctx.createGain();
+            bus.connect(master);
+            var conv = ctx.createConvolver();
+            conv.buffer = impulse(2.8);
+            var wet = ctx.createGain();
+            wet.gain.value = 0.32;
+            bus.connect(conv);
+            conv.connect(wet);
+            wet.connect(master);
+
+            noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.06), ctx.sampleRate);
+            var nd = noise.getChannelData(0);
+            for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+          }
+          if (ctx.state === "suspended") ctx.resume().then(notify, function () {});
+          return ctx;
+        }
+
+        function impulse(sec) {
+          var rate = ctx.sampleRate,
+            len = Math.floor(rate * sec);
+          var b = ctx.createBuffer(2, len, rate);
+          for (var ch = 0; ch < 2; ch++) {
+            var d = b.getChannelData(ch);
+            for (var i = 0; i < len; i++) {
+              var t = i / len;
+              var fadeIn = i < rate * 0.015 ? i / (rate * 0.015) : 1;
+              d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3.4) * fadeIn;
+            }
+          }
+          return b;
+        }
+
+        function voice(freq, when, o) {
+          o = o || {};
+          var vel = o.vel == null ? 0.8 : o.vel;
+          var dur = o.dur || 2.6;
+          var det = o.detune || 0;
+          var bend = o.bend || 0;
+
+          var out = ctx.createGain();
+          var lp = ctx.createBiquadFilter();
+          lp.type = "lowpass";
+          lp.Q.value = 0.4;
+          lp.frequency.setValueAtTime(Math.min(12000, freq * (7 + vel * 10)), when);
+          lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 2.4, 520), when + 1.0);
+          out.gain.setValueAtTime(0.0001, when);
+          out.gain.linearRampToValueAtTime(vel * 0.3, when + 0.005);
+          out.gain.exponentialRampToValueAtTime(vel * 0.1, when + 0.3);
+          out.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+          out.connect(lp);
+          lp.connect(bus);
+
+          var B = 0.00035;
+          [
+            [1, 1],
+            [2, 0.45],
+            [3, 0.2],
+            [4, 0.09],
+            [6, 0.03],
+          ].forEach(function (p) {
+            var n = p[0],
+              g = p[1];
+            var osc = ctx.createOscillator();
+            osc.type = "sine";
+            osc.frequency.value = freq * n * Math.sqrt(1 + B * n * n);
+            osc.detune.setValueAtTime(det, when);
+            if (bend) osc.detune.linearRampToValueAtTime(det + bend, when + 0.55);
+            var pg = ctx.createGain();
+            pg.gain.setValueAtTime(g, when);
+            pg.gain.exponentialRampToValueAtTime(
+              Math.max(g * 0.02, 0.0001),
+              when + Math.max(0.25, dur / (n * 0.9))
+            );
+            osc.connect(pg);
+            pg.connect(out);
+            osc.start(when);
+            osc.stop(when + dur + 0.05);
+          });
+
+          // a slightly detuned triangle for warmth / beating
+          var c = ctx.createOscillator();
+          c.type = "triangle";
+          c.frequency.value = freq;
+          c.detune.setValueAtTime(det + 5, when);
+          if (bend) c.detune.linearRampToValueAtTime(det + 5 + bend, when + 0.55);
+          var cg = ctx.createGain();
+          cg.gain.value = 0.1;
+          c.connect(cg);
+          cg.connect(out);
+          c.start(when);
+          c.stop(when + dur + 0.05);
+
+          // felt hammer
+          var ns = ctx.createBufferSource();
+          ns.buffer = noise;
+          var bp = ctx.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = Math.min(freq * 5, 7000);
+          bp.Q.value = 1.1;
+          var ng = ctx.createGain();
+          ng.gain.setValueAtTime(0.08 * vel, when);
+          ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.045);
+          ns.connect(bp);
+          bp.connect(ng);
+          ng.connect(bus);
+          ns.start(when);
+        }
+
+        function at(delay) {
+          return ctx.currentTime + 0.006 + (delay || 0);
+        }
+
+        return {
+          SCALE: SCALE,
+          ensure: ensure,
+          running: function () {
+            return !!ctx && ctx.state === "running";
+          },
+          onState: function (fn) {
+            listeners.push(fn);
+            return function () {
+              listeners = listeners.filter(function (f) {
+                return f !== fn;
+              });
+            };
+          },
+          setEnabled: function (v) {
+            enabled = v;
+            if (master) master.gain.setTargetAtTime(v ? 0.85 : 0, ctx.currentTime, 0.03);
+          },
+          play: function (i, o) {
+            if (!enabled || !ensure()) return;
+            voice(SCALE[i], at(o && o.delay), o);
+          },
+          // a little flat, and sagging further as it rings
+          playOff: function (i) {
+            if (!enabled || !ensure()) return;
+            voice(SCALE[i], at(), { detune: -42, bend: -34, vel: 0.72, dur: 2.2 });
+          },
+          phrase: function (digits, step) {
+            if (!enabled || !ensure()) return;
+            digits.forEach(function (d, k) {
+              voice(SCALE[d], at(k * step), { vel: 0.62, dur: 1.4 });
+            });
+          },
+          chord: function () {
+            if (!enabled || !ensure()) return;
+            // C major, open voicing, gently rolled from the bass up
+            var notes = [
+              [65.41, 0.38, 5],
+              [130.81, 0.42, 4.8],
+              [196.0, 0.4, 4.4],
+              [329.63, 0.44, 4.2],
+              [392.0, 0.4, 4],
+              [523.25, 0.38, 3.8],
+              [659.25, 0.26, 3.4],
+            ];
+            notes.forEach(function (n, k) {
+              voice(n[0], at(k * 0.022), { vel: n[1], dur: n[2] });
+            });
+          },
+        };
+      })();
+
+      // Older iOS only unlocks audio on touchend; warm the context on the first one.
+      ["touchend", "click"].forEach(function (ev) {
+        window.addEventListener(
+          ev,
+          function once() {
+            window.Synth.ensure();
+            window.removeEventListener(ev, once, true);
+          },
+          true
+        );
+      });
+    </script>
+
+    <script type="text/babel" data-presets="react">
+      const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+      const PIN = [2, 5, 8, 0];
+      const NOTE_NAMES = ["C", "D", "E", "F", "G", "A", "B", "C", "D", "E"];
+      const NOTE_OCT = [4, 4, 4, 4, 4, 4, 4, 5, 5, 5];
+      const CHORD_KEYS = [0, 2, 4, 7];
+      const STEP = 0.125; // seconds between replayed notes
+      // The sound button only appears when this page is embedded in a host page
+      // (an <iframe>), or when forced with ?sound=1. Opened directly, it stays hidden.
+      const SHOW_SOUND_BUTTON = (() => {
+        try {
+          const q = new URLSearchParams(location.search).get("sound");
+          if (q === "1") return true;
+          if (q === "0") return false;
+        } catch (_) {}
+        try {
+          return window.self !== window.top;
+        } catch (_) {
+          return true; // cross-origin parent blocks access: we are framed
+        }
+      })();
+      const DEVICE_W = 412;
+      const DEVICE_H = 866;
+      const reduced =
+        typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      /*
+        Key animator: one damped spring per key, integrated in a single rAF loop.
+        Each spring writes a --d (depression) custom property; CSS turns that into
+        travel, shadow and the orange flood.
+      */
+      function createAnimator() {
+        const springs = Array.from({ length: 10 }, () => ({ x: 0, v: 0, t: 0, k: 600, c: 30 }));
+        const held = new Set();
+        let els = [];
+        let raf = 0;
+        let last = 0;
+        let hovered = -1;
+
+        function frame(now) {
+          const dt = Math.min(0.034, (now - last) / 1000 || 0.016);
+          last = now;
+          const h = dt / 4;
+          let active = false;
+          springs.forEach((s, i) => {
+            for (let n = 0; n < 4; n++) {
+              const a = -s.k * (s.x - s.t) - s.c * s.v;
+              s.v += a * h;
+              s.x += s.v * h;
+            }
+            if (Math.abs(s.x - s.t) > 0.0005 || Math.abs(s.v) > 0.002) active = true;
+            else {
+              s.x = s.t;
+              s.v = 0;
+            }
+            if (els[i]) els[i].style.setProperty("--d", s.x.toFixed(4));
+          });
+          raf = active ? requestAnimationFrame(frame) : 0;
+        }
+        function kick() {
+          if (!raf) {
+            last = performance.now();
+            raf = requestAnimationFrame(frame);
+          }
+        }
+        function set(i, t, k, c) {
+          const s = springs[i];
+          s.t = t;
+          s.k = k;
+          s.c = c;
+          kick();
+        }
+        const api = {
+          attach(list) {
+            els = list;
+          },
+          press(i, depth = 1) {
+            held.add(i);
+            set(i, depth, 1100, 42); // firm, tiny overshoot
+          },
+          release(i) {
+            held.delete(i);
+            set(i, i === hovered ? -0.14 : 0, 380, 15); // bouncy return
+          },
+          tap(i, hold = 100, depth = 1) {
+            api.press(i, depth);
+            setTimeout(() => api.release(i), hold);
+          },
+          hover(i) {
+            if (i === hovered) return;
+            const prev = hovered;
+            hovered = i;
+            if (prev >= 0 && !held.has(prev)) set(prev, 0, 300, 20);
+            if (i >= 0 && !held.has(i)) set(i, -0.14, 300, 20);
+          },
+          wave() {
+            for (let i = 0; i < 10; i++) {
+              setTimeout(() => {
+                if (held.has(i)) return;
+                set(i, 0.16, 700, 26);
+                setTimeout(() => !held.has(i) && set(i, 0, 300, 13), 130);
+              }, i * 62);
+            }
+          },
+        };
+        return api;
+      }
+
+      /* Scale the phone to fit the window on desktop; full-bleed under 640px. */
+      function useDeviceScale() {
+        const get = () => {
+          if (typeof window === "undefined" || window.innerWidth < 640) return null;
+          return Math.min(
+            1,
+            (window.innerHeight - 110) / DEVICE_H,
+            (window.innerWidth - 40) / DEVICE_W
+          );
+        };
+        const [s, setS] = useState(get);
+        useEffect(() => {
+          const on = () => setS(get());
+          window.addEventListener("resize", on);
+          return () => window.removeEventListener("resize", on);
+        }, []);
+        return s;
+      }
+
+      function SoundButton({ on, onClick, page }) {
+        return (
+          <button
+            className={"sound-btn" + (page ? " page" : "") + (on ? " on" : "")}
+            aria-pressed={on}
+            aria-label={on ? "Sound on. Mute" : "Sound off. Turn sound on"}
+            onClick={onClick}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor" stroke="none" />
+              <path className="wave" d="M15.5 9.2a4 4 0 0 1 0 5.6" />
+              <path className="wave wave-2" d="M18.2 6.6a7.6 7.6 0 0 1 0 10.8" />
+              <path className="mute" d="M16 9.5l5 5M21 9.5l-5 5" />
+            </svg>
+          </button>
+        );
+      }
+
+      function StatusBar() {
+        return (
+          <div className="statusbar" aria-hidden="true">
+            <span>9:41</span>
+            <span className="island" />
+            <span className="flex items-center gap-[6px]">
+              <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+                <rect x="0" y="8" width="3" height="4" rx="1" />
+                <rect x="5" y="5.5" width="3" height="6.5" rx="1" />
+                <rect x="10" y="3" width="3" height="9" rx="1" />
+                <rect x="15" y="0" width="3" height="12" rx="1" />
+              </svg>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+                <path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.4C13.5 1.3 10.9.2 8 .2S2.5 1.3.5 3.3l1.3 1.4C3.4 3.1 5.6 2.2 8 2.2z" />
+                <path d="M8 6c1.4 0 2.6.5 3.6 1.4l1.3-1.4C11.6 4.8 9.9 4 8 4s-3.6.8-4.9 2l1.3 1.4C5.4 6.5 6.6 6 8 6z" />
+                <path d="M8 9.6c.6 0 1.1.2 1.5.6L8 11.8 6.5 10.2c.4-.4.9-.6 1.5-.6z" />
+              </svg>
+              <svg width="27" height="13" viewBox="0 0 27 13">
+                <rect
+                  x="0.5"
+                  y="0.5"
+                  width="22"
+                  height="12"
+                  rx="3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeOpacity=".4"
+                />
+                <rect x="2.5" y="2.5" width="18" height="8" rx="2" fill="currentColor" />
+                <path
+                  d="M24.5 4.5v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z"
+                  fill="currentColor"
+                  fillOpacity=".5"
+                />
+              </svg>
+            </span>
+          </div>
+        );
+      }
+
+      /*
+        Abstract composition: one black key, its grey shadow, one taut string.
+        Every note nudges the key down and sets the string trembling.
+      */
+      function Composition({ tick }) {
+        return (
+          <svg className="comp" viewBox="0 0 183 316" aria-hidden="true">
+            <rect x="98" y="150" width="60" height="142" fill="var(--stone)" />
+            <rect
+              key={"b" + tick}
+              className={"comp-bar" + (tick ? " hit" : "")}
+              x="57"
+              y="0"
+              width="52"
+              height="197"
+              fill="var(--ink)"
+            />
+            <rect
+              key={"l" + tick}
+              className={"comp-line" + (tick ? " hit" : "")}
+              x="143.5"
+              y="0"
+              width="1.6"
+              height="316"
+              fill="var(--ink)"
+            />
+          </svg>
+        );
+      }
+
+      /* The resolved chord: C–E–G–C as four rising keys over the same grey and string. */
+      function ChordArt() {
+        const bars = [92, 120, 148, 176];
+        return (
+          <svg viewBox="0 0 200 200" className="w-full h-full" aria-hidden="true">
+            <rect x="104" y="64" width="66" height="136" fill="var(--stone)" />
+            {bars.map((h, k) => (
+              <rect
+                key={k}
+                className="chord-bar"
+                style={{ animationDelay: 120 + k * 110 + "ms" }}
+                x={22 + k * 34}
+                y={200 - h}
+                width="26"
+                height={h}
+                fill="var(--ink)"
+              />
+            ))}
+            <rect x="182" y="0" width="1.6" height="200" fill="var(--ink)" />
+          </svg>
+        );
+      }
+
+      function Dots({ count, status, wobbleKey }) {
+        return (
+          <div
+            key={status === "error" ? "e" + wobbleKey : "n"}
+            className={
+              "dots " + (status === "error" ? "wobble" : status === "success" ? "success" : "")
+            }
+            aria-hidden="true"
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className={"dot" + (i < count ? " on" : "")} style={{ "--i": i }} />
+            ))}
+          </div>
+        );
+      }
+
+      function Staff({ trail }) {
+        return (
+          <div className="staff" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((l) => (
+              <span key={l} className="staff-line" style={{ top: 10 + l * 13 + "px" }} />
+            ))}
+            {trail.map((n, k) => (
+              <span
+                key={n.id}
+                className={"note-dot" + (k === trail.length - 1 ? " hot" : "")}
+                style={{ top: 64 - n.i * 6 + "px" }}
+              />
+            ))}
+          </div>
+        );
+      }
+
+      function Keys({ animator, onDown, freePlay, interactive }) {
+        const keysRef = useRef(null);
+        const keyEls = useRef([]);
+        const pointers = useRef(new Map());
+        const live = useRef({ onDown, freePlay, interactive });
+        live.current = { onDown, freePlay, interactive };
+
+        useEffect(() => {
+          animator.attach(keyEls.current);
+        }, [animator]);
+
+        const indexAt = (clientX) => {
+          const r = keysRef.current.getBoundingClientRect();
+          return Math.max(0, Math.min(9, Math.floor(((clientX - r.left) / r.width) * 10)));
+        };
+
+        const down = (e) => {
+          if (!live.current.interactive) return;
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          try {
+            keysRef.current.setPointerCapture(e.pointerId);
+          } catch (_) {}
+          const i = indexAt(e.clientX);
+          pointers.current.set(e.pointerId, i);
+          animator.press(i);
+          live.current.onDown(i);
+        };
+        const move = (e) => {
+          const cur = pointers.current.get(e.pointerId);
+          if (cur === undefined) {
+            if (e.pointerType === "mouse") animator.hover(indexAt(e.clientX));
+            return;
+          }
+          // glissando, but only when playing freely — never slide extra digits into a PIN
+          if (!live.current.freePlay) return;
+          const i = indexAt(e.clientX);
+          if (i !== cur) {
+            animator.release(cur);
+            animator.press(i);
+            pointers.current.set(e.pointerId, i);
+            live.current.onDown(i);
+          }
+        };
+        const up = (e) => {
+          const cur = pointers.current.get(e.pointerId);
+          if (cur === undefined) return;
+          pointers.current.delete(e.pointerId);
+          animator.release(cur);
+        };
+
+        return (
+          <div
+            ref={keysRef}
+            className={"keys" + (freePlay ? " free" : "")}
+            role="group"
+            aria-label="Piano keypad, digits 0 to 9"
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={up}
+            onPointerLeave={(e) => e.pointerType === "mouse" && animator.hover(-1)}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {NOTE_NAMES.map((n, i) => (
+              <button
+                key={i}
+                ref={(el) => (keyEls.current[i] = el)}
+                className="key"
+                tabIndex={interactive ? 0 : -1}
+                aria-label={freePlay ? `${i}, note ${n}${NOTE_OCT[i]}` : `Digit ${i}`}
+                onClick={(e) => {
+                  // keyboard activation only (Enter / Space); pointers are handled above
+                  if (e.detail !== 0 || !live.current.interactive) return;
+                  animator.tap(i, 110);
+                  live.current.onDown(i);
+                }}
+              >
+                <span className="key-face">
+                  <span className="key-note">{n}</span>
+                  <span className="key-label">{i}</span>
+                  <span className="key-label inv" aria-hidden="true">
+                    {i}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        );
+      }
+
+      function App() {
+        const [mode, setMode] = useState("pin"); // pin | free | unlocked
+        const [digits, setDigits] = useState([]);
+        const [status, setStatus] = useState("idle"); // idle | success | error
+        const [msg, setMsg] = useState(null);
+        const [wobbleKey, setWobbleKey] = useState(0);
+        const [hint, setHint] = useState(false);
+        const [sound, setSound] = useState(() => {
+          try {
+            return localStorage.getItem("pyp-sound") !== "off";
+          } catch (_) {
+            return true;
+          }
+        });
+        // Browsers keep audio suspended until the first click/tap/key; track that.
+        const [audioReady, setAudioReady] = useState(() => window.Synth.running());
+        const soundRef = useRef(sound);
+        soundRef.current = sound;
+
+        useEffect(() => window.Synth.onState(setAudioReady), []);
+        useEffect(() => {
+          window.Synth.setEnabled(sound);
+          try {
+            localStorage.setItem("pyp-sound", sound ? "on" : "off");
+          } catch (_) {}
+        }, [sound]);
+
+        const toggleSound = () => {
+          if (!sound || !audioReady) {
+            // this click is the user gesture that lets the browser start audio
+            window.Synth.setEnabled(true);
+            window.Synth.ensure();
+            setSound(true);
+            [0, 2, 4].forEach((d, k) =>
+              window.Synth.play(d, { delay: 0.05 + k * 0.09, vel: 0.42, dur: 1.6 })
+            );
+          } else {
+            setSound(false);
+          }
+        };
+        const [trail, setTrail] = useState([]);
+        const [lastNote, setLastNote] = useState(null);
+        const [touched, setTouched] = useState(false);
+        const [noteTick, setNoteTick] = useState(0);
+        const scale = useDeviceScale();
+
+        const animator = useMemo(createAnimator, []);
+        const digitsRef = useRef([]);
+        const busy = useRef(false);
+        const modeRef = useRef(mode);
+        const timers = useRef([]);
+        const uid = useRef(0);
+        modeRef.current = mode;
+
+        const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
+        const clearTimers = () => {
+          timers.current.forEach(clearTimeout);
+          timers.current = [];
+        };
+        const putDigits = (d) => {
+          digitsRef.current = d;
+          setDigits(d);
+        };
+
+        // Before anyone touches it, the keys occasionally ripple on their own.
+        useEffect(() => {
+          if (touched || reduced || mode === "unlocked") return;
+          const ripple = () => {
+            animator.wave();
+            // once audio is allowed, the ripple is a soft glissando — so an untouched page still sounds
+            if (soundRef.current && window.Synth.running())
+              for (let i = 0; i < 10; i++)
+                window.Synth.play(i, { delay: i * 0.062, vel: 0.2, dur: 1.5 });
+          };
+          const first = setTimeout(ripple, 1400);
+          const loop = setInterval(ripple, 7000);
+          return () => {
+            clearTimeout(first);
+            clearInterval(loop);
+          };
+        }, [touched, mode, animator]);
+
+        const showMsg = (text, tone, ttl) => {
+          const id = ++uid.current;
+          setMsg({ text, tone, id });
+          if (ttl) later(() => setMsg((m) => (m && m.id === id ? null : m)), ttl);
+        };
+
+        const handleKey = useCallback(
+          (i) => {
+            setTouched(true);
+            const m = modeRef.current;
+            if (m !== "unlocked" && !busy.current) setNoteTick((t) => t + 1);
+
+            if (m === "free") {
+              window.Synth.play(i);
+              const id = ++uid.current;
+              setTrail((t) => [...t.slice(-24), { id, i }]);
+              setTimeout(() => setTrail((t) => t.filter((n) => n.id !== id)), 4300);
+              setLastNote({ i, id });
+              return;
+            }
+            if (m !== "pin" || busy.current) return;
+
+            const next = [...digitsRef.current, i];
+            if (next.length === 1) setMsg(null);
+
+            if (next.length < 4) {
+              window.Synth.play(i);
+              putDigits(next);
+              return;
+            }
+
+            busy.current = true;
+            putDigits(next);
+            const correct = next.every((d, k) => d === PIN[k]);
+
+            if (!correct) {
+              window.Synth.playOff(i);
+              setStatus("error");
+              setWobbleKey((k) => k + 1);
+              showMsg("That didn’t sound quite right.", "ink", 2600);
+              later(() => {
+                putDigits([]);
+                setStatus("idle");
+                busy.current = false;
+              }, 700);
+              return;
+            }
+
+            window.Synth.play(i);
+            const replayAt = 420;
+            const chordAt = replayAt + PIN.length * STEP * 1000 + 40;
+            later(() => {
+              setStatus("success");
+              window.Synth.phrase(PIN, STEP);
+              PIN.forEach((d, k) => later(() => animator.tap(d, 95, 0.8), k * STEP * 1000));
+            }, replayAt);
+            later(() => {
+              window.Synth.chord();
+              CHORD_KEYS.forEach((d) => animator.press(d, 0.9));
+              later(() => CHORD_KEYS.forEach((d) => animator.release(d)), 560);
+              showMsg("That sounds right.", "signal");
+            }, chordAt);
+            later(() => setMode("unlocked"), chordAt + 1400);
+            later(() => {
+              putDigits([]);
+              setStatus("idle");
+              setMsg(null);
+              busy.current = false;
+            }, chordAt + 2200);
+          },
+          [animator]
+        );
+
+        const backspace = () => {
+          if (modeRef.current !== "pin" || busy.current || !digitsRef.current.length) return;
+          putDigits(digitsRef.current.slice(0, -1));
+        };
+
+        const goFree = () => {
+          clearTimers();
+          busy.current = false;
+          putDigits([]);
+          setStatus("idle");
+          setMsg(null);
+          setHint(false);
+          setMode("free");
+        };
+        const goPin = () => {
+          clearTimers();
+          busy.current = false;
+          putDigits([]);
+          setStatus("idle");
+          setMsg(null);
+          setTrail([]);
+          setLastNote(null);
+          setMode("pin");
+        };
+
+        // Physical keyboard: 0–9 play, Backspace undoes, F toggles free play, Esc returns.
+        const keyApi = useRef({});
+        keyApi.current = { handleKey, backspace, goFree, goPin };
+        useEffect(() => {
+          const digitOf = (e) =>
+            /^[0-9]$/.test(e.key)
+              ? +e.key
+              : /^Numpad[0-9]$/.test(e.code)
+                ? +e.code.slice(-1)
+                : null;
+          const down = (e) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            const m = modeRef.current;
+            const d = digitOf(e);
+            if (d !== null) {
+              if (m === "unlocked") return;
+              e.preventDefault();
+              if (e.repeat) return;
+              animator.press(d);
+              keyApi.current.handleKey(d);
+            } else if (e.key === "Backspace") {
+              keyApi.current.backspace();
+            } else if ((e.key === "f" || e.key === "F") && !e.repeat) {
+              m === "free" ? keyApi.current.goPin() : m === "pin" && keyApi.current.goFree();
+            } else if (e.key === "Escape" && m !== "pin") {
+              keyApi.current.goPin();
+            }
+          };
+          const up = (e) => {
+            const d = digitOf(e);
+            if (d !== null) animator.release(d);
+          };
+          window.addEventListener("keydown", down);
+          window.addEventListener("keyup", up);
+          return () => {
+            window.removeEventListener("keydown", down);
+            window.removeEventListener("keyup", up);
+          };
+        }, [animator]);
+
+        const unlocked = mode === "unlocked";
+        const free = mode === "free";
+
+        const liveText = msg
+          ? msg.text
+          : free
+            ? lastNote
+              ? `${NOTE_NAMES[lastNote.i]}${NOTE_OCT[lastNote.i]}`
+              : "Free play"
+            : unlocked
+              ? "Unlocked"
+              : digits.length
+                ? `${digits.length} of 4 entered`
+                : "";
+
+        const framed = scale !== null;
+
+        return (
+          <div className="stage">
+            <h1 className="sr-only">Play Your PIN — you don&rsquo;t type your PIN, you play it.</h1>
+            <div style={framed ? { width: DEVICE_W * scale, height: DEVICE_H * scale } : undefined}>
+              <div className="device" style={framed ? { transform: `scale(${scale})` } : undefined}>
+                <div className="screen flex flex-col">
+                  <StatusBar />
+                  <div aria-live="polite" className="sr-only">
+                    {liveText}
+                  </div>
+
+                  <div className="flex-none h-6" aria-hidden="true" />
+
+                  <div className="relative flex-1 min-h-0">
+                    {/* ---------- Lock / free-play ---------- */}
+                    <div
+                      className={
+                        "layer absolute inset-0 flex flex-col " + (unlocked ? "gone-up" : "")
+                      }
+                      aria-hidden={unlocked}
+                      inert={unlocked ? "" : undefined}
+                    >
+                      <div className="relative flex-1 min-h-0 px-7 flex flex-col">
+                        <div className="relative z-10 pt-[2.2%]">
+                          <p className="headline relative mt-[11%]" aria-hidden="true">
+                            <Composition tick={noteTick} />
+                            You don&rsquo;t
+                            <br />
+                            type your
+                            <br />
+                            PIN.
+                            <br />
+                            <em>You play it.</em>
+                          </p>
+                          <span className="block w-10 h-px bg-ink mt-[9%]" aria-hidden="true" />
+                        </div>
+
+                        <div className="relative z-10 mt-auto mb-[6%] w-[58%] min-h-[104px]">
+                          {/* PIN */}
+                          <div
+                            className={
+                              "layer absolute inset-x-0 bottom-0 flex flex-col items-center text-center " +
+                              (free ? "gone-up" : "")
+                            }
+                          >
+                            <p className="mono mb-4">Enter passcode</p>
+                            <Dots count={digits.length} status={status} wobbleKey={wobbleKey} />
+                            <div className="h-[40px] mt-3 flex items-start justify-center">
+                              {msg ? (
+                                <p
+                                  key={msg.id}
+                                  className={
+                                    "msg italic font-bold text-[16px] leading-[1.15] [font-stretch:80%] " +
+                                    (msg.tone === "signal" ? "text-signal" : "text-ink")
+                                  }
+                                >
+                                  {msg.text}
+                                </p>
+                              ) : !touched ? (
+                                <p className="msg mono !text-[9.5px] text-muted pt-1">
+                                  Tap a key. Listen.
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Free play */}
+                          <div
+                            className={
+                              "layer absolute inset-x-0 bottom-0 " + (free ? "" : "gone-down")
+                            }
+                            aria-hidden={!free}
+                          >
+                            <div className="flex items-end justify-between">
+                              <p className="mono">Free play</p>
+                              <p className="headline !text-[34px] text-signal h-[30px] min-w-[2ch] text-right">
+                                {lastNote && (
+                                  <span key={lastNote.id} className="msg inline-block italic">
+                                    {NOTE_NAMES[lastNote.i]}
+                                    <sub className="mono !text-[9px] !tracking-normal text-muted not-italic align-baseline ml-0.5">
+                                      {NOTE_OCT[lastNote.i]}
+                                    </sub>
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <Staff trail={trail} />
+                            <p className="mono !text-[9px] !tracking-[0.14em] text-muted">
+                              Slide across. Try two at once.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-none px-[18px]">
+                        <Keys
+                          animator={animator}
+                          onDown={handleKey}
+                          freePlay={free}
+                          interactive={!unlocked}
+                        />
+                      </div>
+
+                      <div
+                        className={`flex-none flex items-center justify-between px-7 pt-[3%] pb-[max(26px,env(safe-area-inset-bottom))] sm:pb-[34px] min-h-[44px]`}
+                      >
+                        {free ? (
+                          <>
+                            <button className="linkbtn u" onClick={goPin}>
+                              <span className="arrow">&larr;</span>
+                              <span>Passcode</span>
+                            </button>
+                            <span className="mono text-muted">C major</span>
+                          </>
+                        ) : hint ? (
+                          <button className="linkbtn" onClick={() => setHint(false)}>
+                            Demo PIN <span className="text-signal font-semibold">2 5 8 0</span>
+                            <span className="text-muted">&times;</span>
+                          </button>
+                        ) : (
+                          <>
+                            <button className="linkbtn u" onClick={() => setHint(true)}>
+                              <span>Forgot it?</span>
+                            </button>
+                            <button className="linkbtn" onClick={goFree}>
+                              Just play <span className="arrow">&rarr;</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ---------- Unlocked ---------- */}
+                    <div
+                      className={
+                        "layer absolute inset-0 flex flex-col px-7 " + (unlocked ? "" : "gone-down")
+                      }
+                      aria-hidden={!unlocked}
+                      inert={unlocked ? undefined : ""}
+                    >
+                      <p className="mono leading-[1.75] text-[10.5px] pt-[2.2%]">
+                        Unlocked
+                        <br />
+                        Passcode accepted
+                      </p>
+
+                      <div className="relative flex-1 min-h-0 flex items-center justify-center">
+                        {unlocked && (
+                          <div className="relative w-[min(70%,calc(var(--h)*0.3))] aspect-square">
+                            <ChordArt />
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <h2 className="headline">
+                          Welcome
+                          <br />
+                          back.
+                          <br />
+                          <em>Right on key.</em>
+                        </h2>
+                        <p className="mt-6 text-[15px] leading-[1.5] text-muted max-w-[290px]">
+                          Four notes in, one chord out. Your passcode was a melody all along.
+                        </p>
+                      </div>
+
+                      <div className="pt-8 pb-[max(30px,env(safe-area-inset-bottom))] sm:pb-[40px] flex flex-col items-center gap-1">
+                        <button className="solid-btn" onClick={goPin}>
+                          Lock again
+                        </button>
+                        <button className="linkbtn" onClick={goFree}>
+                          Just play <span className="arrow">&rarr;</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="home-ind" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+            {SHOW_SOUND_BUTTON && (
+              <SoundButton page on={sound && audioReady} onClick={toggleSound} />
+            )}
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
