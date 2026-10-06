@@ -794,6 +794,46 @@
           filter: none;
         }
       }
+
+      /* ---------- Demo PIN hint ---------- */
+      .pin-hint {
+        position: fixed;
+        left: 28px;
+        bottom: 28px;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        color: var(--ink);
+        pointer-events: none;
+      }
+      .pin-hint .label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .pin-hint .digits {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.32em;
+      }
+      @media (max-width: 639px) {
+        /* full-screen phone: mirror the sound button at the top so the bottom links stay clear */
+        .pin-hint {
+          left: 16px;
+          bottom: auto;
+          top: calc(env(safe-area-inset-top) + 12px);
+          flex-direction: row;
+          align-items: baseline;
+          gap: 8px;
+        }
+        .pin-hint .digits {
+          font-size: 15px;
+        }
+      }
     </style>
 
     <script>
@@ -836,6 +876,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <p class="pin-hint">
+      <span class="label">Demo PIN</span>
+      <span class="digits">2580</span>
+    </p>
     <noscript>
       <p style="padding: 40px; font-family: sans-serif">
         Play Your PIN needs JavaScript to make sound.
